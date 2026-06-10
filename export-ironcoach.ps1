@@ -6,8 +6,8 @@ $ErrorActionPreference = "Stop"
 
 $RepoPath   = "C:\Users\angus\OneDrive\Enervest\Andrews Temp folder"
 $SourceFile = "C:\Users\angus\Downloads\ironman-live-dashboard.jsx"
-$DestFolder = Join-Path $RepoPath "dashboard"
-$DestFile   = Join-Path $DestFolder "ironman-live-dashboard.jsx"
+$DestFolder = Join-Path $RepoPath "web\src"
+$DestFile   = Join-Path $DestFolder "dashboard.jsx"
 $LogFile    = Join-Path $RepoPath ".export-log.txt"
 
 function Log($msg) {
