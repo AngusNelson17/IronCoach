@@ -824,11 +824,14 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
     })();
   }, []);
 
-  // Convert this week's planner into calendar events using each session's
-  // explicit time + mins. Sessions without an explicit time fall back to 7:00.
-  const plannerToEvents = () => {
+  const [syncTarget, setSyncTarget] = useState("this"); // "this" | "next"
+
+  // Convert a given week's planner into tagged calendar events.
+  // weekStartISO is YYYY-MM-DD (Monday). Each event carries the session's
+  // stable id so the backend can reconcile (create/update/delete) on re-sync.
+  const plannerToEvents = (weekStartISO) => {
     const dayIdx = {Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4,Saturday:5,Sunday:6};
-    const base = new Date(thisWeekStart);
+    const base = new Date(`${weekStartISO}T00:00:00`);
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Australia/Melbourne";
     const events = [];
     planner.forEach(day => {
@@ -839,6 +842,7 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
         const start = new Date(d); start.setHours(hh, mm || 0, 0, 0);
         const end = new Date(start); end.setMinutes(end.getMinutes() + dur);
         events.push({
+          sessionId: s.id,
           summary: `🏃 ${s.label}`,
           description: `IronCoach planner · ${s.type}${s.caution ? "\n⚠ Wait for physio clearance" : ""}`,
           start: { dateTime: start.toISOString(), timeZone: tz },
@@ -849,24 +853,41 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
     return events;
   };
 
+  const targetWeekStart = (() => {
+    if (syncTarget === "next") {
+      const d = new Date(`${thisWeekStart}T00:00:00`);
+      d.setDate(d.getDate() + 7);
+      return d.toISOString().split("T")[0];
+    }
+    return thisWeekStart;
+  })();
+
   const pushToCalendar = async () => {
     setPushing(true);
-    setPushMsg("Pushing events…");
+    setPushMsg("Syncing planner → Calendar…");
     try {
-      const events = plannerToEvents();
+      const events = plannerToEvents(targetWeekStart);
       const r = await fetch("/api/google/push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ calendarId: "primary", events }),
+        body: JSON.stringify({ calendarId: "primary", weekStart: targetWeekStart, events }),
       });
       const data = await r.json();
-      if (r.ok) setPushMsg(`✓ Pushed ${data.created}/${events.length} events to your primary calendar`);
-      else setPushMsg(`Failed: ${data.error || r.status}`);
+      if (r.ok) {
+        const parts = [];
+        if (data.created) parts.push(`${data.created} created`);
+        if (data.updated) parts.push(`${data.updated} updated`);
+        if (data.deleted) parts.push(`${data.deleted} deleted`);
+        if (data.sweptLegacy) parts.push(`${data.sweptLegacy} legacy removed`);
+        setPushMsg(parts.length ? `✓ ${parts.join(", ")}` : "✓ Already in sync");
+      } else {
+        setPushMsg(`Failed: ${data.error || r.status}`);
+      }
     } catch (e) {
       setPushMsg(`Failed: ${e.message}`);
     }
     setPushing(false);
-    setTimeout(() => setPushMsg(""), 8000);
+    setTimeout(() => setPushMsg(""), 10000);
   };
 
   // Build a paste-ready summary for Claude conversations
@@ -1011,12 +1032,21 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
         )}
 
         <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{display:"inline-flex",borderRadius:6,overflow:"hidden",border:`1px solid ${T.border}`}}>
+            {[["this","This week"],["next","Next week"]].map(([k,l]) => (
+              <button key={k} onClick={()=>setSyncTarget(k)} style={{
+                padding:"6px 12px",fontSize:12,cursor:"pointer",border:"none",
+                background:syncTarget===k?T.bg4:T.bg3,
+                color:syncTarget===k?T.text:T.text2,fontWeight:syncTarget===k?600:400,
+              }}>{l}</button>
+            ))}
+          </div>
           <Btn
             primary
             disabled={googleStatus.state !== "connected" || pushing}
             onClick={pushToCalendar}
           >
-            📅 {pushing ? "Pushing…" : "Push this week to Calendar"}
+            📅 {pushing ? "Syncing…" : `Sync ${syncTarget === "next" ? "next" : "this"} week`}
           </Btn>
           {googleStatus.state === "needs-token" && (
             <a href="/api/google/authorize" style={{textDecoration:"none"}}>
@@ -1024,6 +1054,11 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
             </a>
           )}
           {pushMsg && <span style={{fontSize:12,color:pushMsg.startsWith("✓")?T.green:T.amber}}>{pushMsg}</span>}
+        </div>
+        <div style={{fontSize:11,color:T.text3,marginTop:10,lineHeight:1.6}}>
+          Re-syncing is safe: matches each session by id, so existing events update in place,
+          removed sessions get deleted, new ones are created. Any legacy "IronCoach planner"
+          events from before this round (with wonky timings) get swept up too.
         </div>
       </Section>
 
