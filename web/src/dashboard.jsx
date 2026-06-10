@@ -489,6 +489,8 @@ export default function IronmanDashboard() {
           diary={diary}
           phase={phase}
           daysToRace={cd.total}
+          planner={planner}
+          thisWeekStart={thisWeekStart}
         />}
       </div>
 
@@ -790,9 +792,12 @@ function DiaryTab({ diary, setDiary }) {
 }
 
 // ─── SETTINGS TAB ────────────────────────────────────────────────────────────
-function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace }) {
+function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner, thisWeekStart }) {
   const [stravaStatus, setStravaStatus] = useState("checking");
   const [copyMsg, setCopyMsg] = useState("");
+  const [googleStatus, setGoogleStatus] = useState({ state: "checking" });
+  const [pushing, setPushing] = useState(false);
+  const [pushMsg, setPushMsg] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -800,8 +805,73 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace }) {
         const r = await fetch("/api/strava/sync");
         setStravaStatus(r.ok ? "connected" : "needs-setup");
       } catch { setStravaStatus("error"); }
+      try {
+        const r = await fetch("/api/google/status");
+        const d = await r.json();
+        if (d.connected) setGoogleStatus({ state: "connected" });
+        else if (d.oauthConfigured) setGoogleStatus({ state: "needs-token", missing: d.missing });
+        else setGoogleStatus({ state: "needs-setup", missing: d.missing });
+      } catch { setGoogleStatus({ state: "error" }); }
     })();
   }, []);
+
+  // Convert this week's planner into calendar events.
+  // Heuristics: "AM:" -> 6:00am, "PM:" -> 5:00pm, "AM/PM:" -> 7:00am.
+  // Duration by type with keyword overrides for long rides / runs.
+  const plannerToEvents = () => {
+    const dayIdx = {Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4,Saturday:5,Sunday:6};
+    const base = new Date(thisWeekStart);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Australia/Melbourne";
+    const events = [];
+    planner.forEach(day => {
+      const d = new Date(base); d.setDate(base.getDate() + (dayIdx[day.day] ?? 0));
+      day.sessions.forEach((s, i) => {
+        let hour = 7, mins = 60;
+        if (/^AM\//.test(s.label)) hour = 7;
+        else if (/^AM:/.test(s.label)) hour = 6;
+        else if (/^PM:/.test(s.label)) hour = 17;
+        // duration by type
+        if (s.type === "Swim") mins = 60;
+        else if (s.type === "Bike") mins = /35km|extended|long/i.test(s.label) ? 150 : 50;
+        else if (s.type === "Run") mins = /12km|block|long|tempo/i.test(s.label) ? 80 : 45;
+        else if (s.type === "Gym") mins = 50;
+        else if (s.type === "Football") mins = 90;
+        else if (s.type === "Walk") mins = 30;
+        else if (s.type === "Mobility") mins = 20;
+        // stagger same-period sessions by 15 min to avoid stacking
+        const offsetMin = i * 5;
+        const start = new Date(d); start.setHours(hour, offsetMin, 0, 0);
+        const end = new Date(start); end.setMinutes(end.getMinutes() + mins);
+        events.push({
+          summary: `🏃 ${s.label}`,
+          description: `IronCoach planner · type: ${s.type}${s.caution ? "\n⚠ Wait for physio clearance" : ""}`,
+          start: { dateTime: start.toISOString(), timeZone: tz },
+          end: { dateTime: end.toISOString(), timeZone: tz },
+        });
+      });
+    });
+    return events;
+  };
+
+  const pushToCalendar = async () => {
+    setPushing(true);
+    setPushMsg("Pushing events…");
+    try {
+      const events = plannerToEvents();
+      const r = await fetch("/api/google/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ calendarId: "primary", events }),
+      });
+      const data = await r.json();
+      if (r.ok) setPushMsg(`✓ Pushed ${data.created}/${events.length} events to your primary calendar`);
+      else setPushMsg(`Failed: ${data.error || r.status}`);
+    } catch (e) {
+      setPushMsg(`Failed: ${e.message}`);
+    }
+    setPushing(false);
+    setTimeout(() => setPushMsg(""), 8000);
+  };
 
   // Build a paste-ready summary for Claude conversations
   const buildClaudeSummary = () => {
@@ -912,20 +982,53 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace }) {
       <Section
         title="Google Calendar export"
         status
-        statusColor={T.amber}
-        statusLabel="Not connected yet — finish setup steps"
+        statusColor={
+          googleStatus.state==="connected"?T.green:
+          googleStatus.state==="needs-token"?T.amber:
+          googleStatus.state==="checking"?T.text3:T.amber
+        }
+        statusLabel={
+          googleStatus.state==="connected"?"Connected — ready to push":
+          googleStatus.state==="needs-token"?"OAuth configured — needs one-time authorize":
+          googleStatus.state==="checking"?"Checking…":
+          "Not connected — paste Google credentials to Claude"
+        }
       >
         <div style={{fontSize:13,color:T.text2,lineHeight:1.7,marginBottom:12}}>
-          Push planner sessions to a Google Calendar so your training week shows up in your normal calendar alongside everything else.
+          Push this week's planner sessions to your Google Calendar so your training week shows up alongside everything else. Re-pushing creates duplicates — use sparingly until we add idempotency.
         </div>
-        <ol style={{fontSize:13,color:T.text2,lineHeight:1.8,paddingLeft:20,marginBottom:12}}>
-          <li>Create a Google Cloud project at <span style={{color:T.text3}}>console.cloud.google.com</span></li>
-          <li>Enable the <strong>Google Calendar API</strong></li>
-          <li>Create an OAuth 2.0 Client ID (Web application)</li>
-          <li>Add redirect URI: <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4,fontSize:11}}>https://iron-coach-delta.vercel.app/api/google/callback</code></li>
-          <li>Paste the Client ID + Secret back to Claude — he'll wire up the rest</li>
-        </ol>
-        <Btn disabled>Connect Google Calendar (set up first)</Btn>
+
+        {googleStatus.state === "needs-setup" && (
+          <ol style={{fontSize:13,color:T.text2,lineHeight:1.8,paddingLeft:20,marginBottom:12}}>
+            <li>Create a Google Cloud project at <span style={{color:T.text3}}>console.cloud.google.com</span></li>
+            <li>Enable the <strong>Google Calendar API</strong></li>
+            <li>Create an OAuth 2.0 Client ID (Web application)</li>
+            <li>Add redirect URI: <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4,fontSize:11}}>https://iron-coach-delta.vercel.app/api/google/callback</code></li>
+            <li>Paste the Client ID + Secret back to Claude — he'll set the env vars</li>
+          </ol>
+        )}
+
+        {googleStatus.state === "needs-token" && (
+          <div style={{fontSize:13,color:T.text2,lineHeight:1.7,marginBottom:12}}>
+            Client ID/Secret are set. One step left: visit <a href="/api/google/authorize" style={{color:T.teal}}>/api/google/authorize</a> to grant Calendar access, then paste the printed refresh token to Claude (or add it as <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4}}>GOOGLE_REFRESH_TOKEN</code> in Vercel and redeploy).
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <Btn
+            primary
+            disabled={googleStatus.state !== "connected" || pushing}
+            onClick={pushToCalendar}
+          >
+            📅 {pushing ? "Pushing…" : "Push this week to Calendar"}
+          </Btn>
+          {googleStatus.state === "needs-token" && (
+            <a href="/api/google/authorize" style={{textDecoration:"none"}}>
+              <Btn style={{borderColor:T.blue,color:T.blue,background:"transparent"}}>Authorize Google</Btn>
+            </a>
+          )}
+          {pushMsg && <span style={{fontSize:12,color:pushMsg.startsWith("✓")?T.green:T.amber}}>{pushMsg}</span>}
+        </div>
       </Section>
 
       {/* Data storage */}
