@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "PowerShell($candidates = @\\(\"C:\\\\Program Files\\\\Git\\\\cmd\\\\git.exe\",\"C:\\\\Program Files \\(x86\\)\\\\Git\\\\cmd\\\\git.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\Git\\\\cmd\\\\git.exe\"\\); $candidates | ForEach-Object { if \\(Test-Path $_\\) { \"FOUND: $_\"; & $_ --version } })",
-      "PowerShell($env:Path = \"C:\\\\Program Files\\\\Git\\\\cmd;$env:Path\"; git config --global user.name; git config --global user.email)"
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\Git\\\\cmd;$env:Path\"; git config --global user.name; git config --global user.email)",
+      "PowerShell(& \".\\\\setup-task.ps1\")",
+      "PowerShell(Get-ScheduledTask -TaskName \"IronCoach Dashboard Daily Export\")",
+      "PowerShell(Get-ScheduledTaskInfo -TaskName \"IronCoach Dashboard Daily Export\")",
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\Git\\\\cmd;$env:Path\"; git ls-files; \\(Get-ScheduledTaskInfo -TaskName \"IronCoach Dashboard Daily Export\"\\).NextRunTime)"
     ]
   }
 }
