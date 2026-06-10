@@ -1,0 +1,24 @@
+# Build output / deps (in case repo grows)
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
+
+# Logs
+*.log
+.export-log.txt

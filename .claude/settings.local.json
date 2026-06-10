@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($candidates = @\\(\"C:\\\\Program Files\\\\Git\\\\cmd\\\\git.exe\",\"C:\\\\Program Files \\(x86\\)\\\\Git\\\\cmd\\\\git.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\Git\\\\cmd\\\\git.exe\"\\); $candidates | ForEach-Object { if \\(Test-Path $_\\) { \"FOUND: $_\"; & $_ --version } })",
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\Git\\\\cmd;$env:Path\"; git config --global user.name; git config --global user.email)"
+    ]
+  }
+}
