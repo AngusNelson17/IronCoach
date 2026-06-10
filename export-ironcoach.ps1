@@ -6,8 +6,13 @@ $ErrorActionPreference = "Stop"
 
 $RepoPath   = "C:\Users\angus\OneDrive\Enervest\Andrews Temp folder"
 $SourceFile = "C:\Users\angus\Downloads\ironman-live-dashboard.jsx"
-$DestFolder = Join-Path $RepoPath "web\src"
-$DestFile   = Join-Path $DestFolder "dashboard.jsx"
+# Archive folder: daily snapshots of the raw Claude artifact for history.
+# Deployed code lives in web/src/dashboard.jsx and is evolved via git -
+# we no longer overwrite it from the artifact, since the deployed version
+# has real Strava OAuth and other diffs the artifact doesn't know about.
+$DestFolder = Join-Path $RepoPath "archive"
+$DateStamp  = Get-Date -Format "yyyy-MM-dd"
+$DestFile   = Join-Path $DestFolder "ironman-live-dashboard_$DateStamp.jsx"
 $LogFile    = Join-Path $RepoPath ".export-log.txt"
 
 function Log($msg) {

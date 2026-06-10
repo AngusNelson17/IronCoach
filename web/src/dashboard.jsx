@@ -112,25 +112,15 @@ async function saveState(state) {
   try { await window.storage.set(STORAGE_KEY, JSON.stringify(state)); } catch (e) { console.error("save failed", e); }
 }
 
-// ─── STRAVA LIVE SYNC via Claude API + MCP ───────────────────────────────────
-async function syncStrava(sinceDate) {
-  const prompt = `Use the Strava list_activities tool to fetch my recent activities${sinceDate ? ` since ${sinceDate}` : " (last 30)"}. Then respond with ONLY a JSON array, no markdown, no backticks, no other text. Each element: {"id":"<string>","name":"<string>","type":"<Swim|Bike|Run|Gym|Row|Walk|Other>","date":"YYYY-MM-DD","dist":<metres,number>,"mins":<moving minutes,number>,"cal":<calories,number or 0>}. Map sport_type: Swim->Swim, Ride->Bike, Run->Run, WeightTraining->Gym, Rowing->Row, Walk->Walk, anything else->Other.`;
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }],
-      mcp_servers: [{ type: "url", url: "https://mcp.strava.com/mcp", name: "strava" }],
-    }),
-  });
-  const data = await response.json();
-  const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
-  const clean = text.replace(/```json|```/g, "").trim();
-  const start = clean.indexOf("["), end = clean.lastIndexOf("]");
-  if (start === -1 || end === -1) throw new Error("No JSON found in response");
-  return JSON.parse(clean.slice(start, end + 1));
+// ─── STRAVA LIVE SYNC via our /api/strava/sync serverless function ──────────
+async function syncStrava() {
+  const r = await fetch("/api/strava/sync");
+  if (!r.ok) {
+    let detail = "";
+    try { detail = (await r.json()).error || ""; } catch {}
+    throw new Error(detail || `HTTP ${r.status}`);
+  }
+  return await r.json();
 }
 
 // ─── SMALL COMPONENTS ────────────────────────────────────────────────────────
