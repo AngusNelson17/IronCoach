@@ -39,41 +39,45 @@ const SEED_ACTIVITIES = [
   {id:"18524335318",name:"Shake Out",type:"Run",date:"2026-05-16",dist:5429,mins:26,cal:578,src:"strava"},
 ];
 
-// ─── WEEKLY PLANNER TEMPLATE (from Gus's 2026 planner) ──────────────────────
+// ─── WEEKLY PLANNER TEMPLATE (from Gus's 2026 planner PDF) ──────────────────
+// Each session has explicit time (24h) + duration so calendar push lands on
+// the right slots. Sunday-start week to match weekStartOf() Monday-anchored
+// indexing in SettingsTab.plannerToEvents (Monday=0, …, Sunday=6).
 const DEFAULT_PLANNER = [
-  {day:"Monday",sessions:[
-    {id:"mon1",label:"AM: Bike Commute (8km+)",type:"Bike"},
-    {id:"mon2",label:"PM: Bike Commute (8km+)",type:"Bike"},
-    {id:"mon3",label:"PM: Gym (Upper A)",type:"Gym"},
-    {id:"mon4",label:"PM: Squad Swim (Hard)",type:"Swim"},
+  {day:"Monday", sessions:[
+    {id:"mon1", label:"Bike commute → South Yarra",                type:"Bike",  time:"07:00", mins:60},
+    {id:"mon2", label:"Gym — Upper A (Anytime Fitness South Yarra)", type:"Gym", time:"08:00", mins:60},
+    {id:"mon3", label:"Bike commute → home",                       type:"Bike",  time:"17:00", mins:30},
+    {id:"mon4", label:"Swim",                                      type:"Swim",  time:"20:00", mins:60},
   ]},
-  {day:"Tuesday",sessions:[
-    {id:"tue1",label:"AM: Bike Commute (8km+)",type:"Bike"},
-    {id:"tue2",label:"PM: Bike Commute (8km+)",type:"Bike"},
-    {id:"tue3",label:"PM: Gym (Lower A)",type:"Gym"},
+  {day:"Tuesday", sessions:[
+    {id:"tue1", label:"Morning walk",                              type:"Walk",  time:"06:30", mins:30},
+    {id:"tue2", label:"Ride to work",                              type:"Bike",  time:"08:15", mins:30},
+    {id:"tue3", label:"Ride home",                                 type:"Bike",  time:"17:00", mins:30},
+    {id:"tue4", label:"Gym — Lower B (Anytime Fitness Kew)",       type:"Gym",   time:"17:30", mins:60},
   ]},
-  {day:"Wednesday",sessions:[
-    {id:"wed1",label:"AM: Tempo Run Commute (8km+)",type:"Run",caution:true},
-    {id:"wed2",label:"PM: Gym (Upper B)",type:"Gym"},
-    {id:"wed3",label:"PM: Squad Swim (Light)",type:"Swim"},
+  {day:"Wednesday", sessions:[
+    {id:"wed1", label:"Bike commute → South Yarra",                type:"Bike",  time:"07:00", mins:60},
+    {id:"wed2", label:"Gym — Upper B (Anytime Fitness South Yarra)", type:"Gym", time:"08:00", mins:60},
+    {id:"wed3", label:"Bike commute → home",                       type:"Bike",  time:"17:00", mins:30},
+    {id:"wed4", label:"Swim",                                      type:"Swim",  time:"20:00", mins:60},
   ]},
-  {day:"Thursday",sessions:[
-    {id:"thu1",label:"AM: Gym (Lower B)",type:"Gym"},
-    {id:"thu2",label:"PM: Football Training",type:"Football",caution:true},
+  {day:"Thursday", sessions:[
+    {id:"thu1", label:"Gym — Lower B (Anytime Fitness Kew)",       type:"Gym",   time:"07:00", mins:60},
+    {id:"thu2", label:"Ride to work",                              type:"Bike",  time:"08:15", mins:30},
+    {id:"thu3", label:"Ride home",                                 type:"Bike",  time:"17:00", mins:30},
+    {id:"thu4", label:"Footy training",                            type:"Football", time:"18:00", mins:90, caution:true},
   ]},
-  {day:"Friday",sessions:[
-    {id:"fri1",label:"AM: Morning Walk",type:"Walk"},
-    {id:"fri2",label:"AM/PM: Football Skills",type:"Football",caution:true},
-    {id:"fri3",label:"PM: Easy Run (8km+)",type:"Run",caution:true},
+  {day:"Friday", sessions:[
+    {id:"fri1", label:"2-hour bike session",                       type:"Bike",  time:"06:00", mins:120},
+    {id:"fri2", label:"45-min run session",                        type:"Run",   time:"08:15", mins:45, caution:true},
   ]},
-  {day:"Saturday",sessions:[
-    {id:"sat1",label:"AM: Morning Walk",type:"Walk"},
-    {id:"sat2",label:"AM/PM: Football Game",type:"Football",caution:true},
+  {day:"Saturday", sessions:[
+    {id:"sat1", label:"Stretching / Pilates (Week A)",             type:"Mobility", time:"09:00", mins:45},
+    {id:"sat2", label:"Bike ride with Dad (Week B)",               type:"Bike",     time:"07:00", mins:120},
   ]},
-  {day:"Sunday",sessions:[
-    {id:"sun1",label:"AM: Extended Bike Ride (35km+)",type:"Bike"},
-    {id:"sun2",label:"PM: Block Run (12km+)",type:"Run",caution:true},
-    {id:"sun3",label:"PM: Mobility / Stretching",type:"Mobility"},
+  {day:"Sunday", sessions:[
+    {id:"sun1", label:"Long run",                                  type:"Run",   time:"08:00", mins:120, caution:true},
   ]},
 ];
 
@@ -376,8 +380,13 @@ export default function IronmanDashboard() {
                         <label key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:6,background:done?typeDim(s.type):T.bg3,cursor:"pointer",opacity:done?0.75:1,border:`1px solid ${done?typeColor(s.type)+"44":"transparent"}`}}>
                           <input type="checkbox" checked={done} onChange={() => setChecked(c => ({...c,[thisWeekStart]:{...(c[thisWeekStart]||{}),[s.id]:!done}}))}
                             style={{accentColor:typeColor(s.type),width:15,height:15,cursor:"pointer"}}/>
+                          {s.time && (
+                            <span style={{fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace",fontSize:12,color:T.text3,minWidth:46,textAlign:"right"}}>{s.time}</span>
+                          )}
                           <span style={{flex:1,fontSize:13,color:done?T.text2:T.text,textDecoration:done?"line-through":"none"}}>
-                            {s.label}{s.caution && <span style={{color:T.amber,marginLeft:6,fontSize:11}}>⚠ physio</span>}
+                            {s.label}
+                            {s.mins && <span style={{color:T.text3,fontSize:11,marginLeft:6}}>· {s.mins}min</span>}
+                            {s.caution && <span style={{color:T.amber,marginLeft:6,fontSize:11}}>⚠ physio</span>}
                           </span>
                           <Badge color={typeColor(s.type)} dim={typeDim(s.type)}>{s.type}</Badge>
                         </label>
@@ -815,9 +824,8 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
     })();
   }, []);
 
-  // Convert this week's planner into calendar events.
-  // Heuristics: "AM:" -> 6:00am, "PM:" -> 5:00pm, "AM/PM:" -> 7:00am.
-  // Duration by type with keyword overrides for long rides / runs.
+  // Convert this week's planner into calendar events using each session's
+  // explicit time + mins. Sessions without an explicit time fall back to 7:00.
   const plannerToEvents = () => {
     const dayIdx = {Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4,Saturday:5,Sunday:6};
     const base = new Date(thisWeekStart);
@@ -825,26 +833,14 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
     const events = [];
     planner.forEach(day => {
       const d = new Date(base); d.setDate(base.getDate() + (dayIdx[day.day] ?? 0));
-      day.sessions.forEach((s, i) => {
-        let hour = 7, mins = 60;
-        if (/^AM\//.test(s.label)) hour = 7;
-        else if (/^AM:/.test(s.label)) hour = 6;
-        else if (/^PM:/.test(s.label)) hour = 17;
-        // duration by type
-        if (s.type === "Swim") mins = 60;
-        else if (s.type === "Bike") mins = /35km|extended|long/i.test(s.label) ? 150 : 50;
-        else if (s.type === "Run") mins = /12km|block|long|tempo/i.test(s.label) ? 80 : 45;
-        else if (s.type === "Gym") mins = 50;
-        else if (s.type === "Football") mins = 90;
-        else if (s.type === "Walk") mins = 30;
-        else if (s.type === "Mobility") mins = 20;
-        // stagger same-period sessions by 15 min to avoid stacking
-        const offsetMin = i * 5;
-        const start = new Date(d); start.setHours(hour, offsetMin, 0, 0);
-        const end = new Date(start); end.setMinutes(end.getMinutes() + mins);
+      day.sessions.forEach(s => {
+        const [hh, mm] = (s.time || "07:00").split(":").map(Number);
+        const dur = s.mins || 60;
+        const start = new Date(d); start.setHours(hh, mm || 0, 0, 0);
+        const end = new Date(start); end.setMinutes(end.getMinutes() + dur);
         events.push({
           summary: `🏃 ${s.label}`,
-          description: `IronCoach planner · type: ${s.type}${s.caution ? "\n⚠ Wait for physio clearance" : ""}`,
+          description: `IronCoach planner · ${s.type}${s.caution ? "\n⚠ Wait for physio clearance" : ""}`,
           start: { dateTime: start.toISOString(), timeZone: tz },
           end: { dateTime: end.toISOString(), timeZone: tz },
         });

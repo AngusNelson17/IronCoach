@@ -9,7 +9,15 @@
       "PowerShell($env:Path = \"C:\\\\Program Files\\\\Git\\\\cmd;$env:Path\"; git ls-files; \\(Get-ScheduledTaskInfo -TaskName \"IronCoach Dashboard Daily Export\"\\).NextRunTime)",
       "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); node --version; npm --version)",
       "WebFetch(domain:iron-coach-delta.vercel.app)",
-      "WebFetch(domain:iron-coach-angus-nelson-s-projects.vercel.app)"
+      "WebFetch(domain:iron-coach-angus-nelson-s-projects.vercel.app)",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "mcp__Claude_in_Chrome__select_browser",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__read_page",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__find"
     ]
   }
 }
