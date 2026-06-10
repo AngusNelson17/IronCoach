@@ -157,6 +157,7 @@ export default function IronmanDashboard() {
   const [syncMsg, setSyncMsg] = useState("");
   const [lastSync, setLastSync] = useState("2026-06-10 (seed)");
   const [showLog, setShowLog] = useState(false);
+  const [diary, setDiary] = useState({});          // {dateStr: {mood, sleep, rpe, body, fuel, reflection, injury}}
   const [loaded, setLoaded] = useState(false);
 
   // load persisted state
@@ -169,6 +170,7 @@ export default function IronmanDashboard() {
         if (s.manualLogs) setManualLogs(s.manualLogs);
         if (s.lastSync) setLastSync(s.lastSync);
         if (s.planner) setPlanner(s.planner);
+        if (s.diary) setDiary(s.diary);
       }
       setLoaded(true);
     })();
@@ -177,8 +179,8 @@ export default function IronmanDashboard() {
   // persist on change
   useEffect(() => {
     if (!loaded) return;
-    saveState({ activities, checked, manualLogs, lastSync, planner });
-  }, [activities, checked, manualLogs, lastSync, planner, loaded]);
+    saveState({ activities, checked, manualLogs, lastSync, planner, diary });
+  }, [activities, checked, manualLogs, lastSync, planner, diary, loaded]);
 
   const doSync = useCallback(async () => {
     setSyncing(true);
@@ -229,21 +231,27 @@ export default function IronmanDashboard() {
   // ── TABS ──
   const tabs = [
     {id:"dashboard",label:"Dashboard"},
-    {id:"planner",label:"Weekly planner"},
+    {id:"planner",label:"Planner"},
+    {id:"diary",label:"Diary"},
     {id:"feed",label:"Activity feed"},
     {id:"analytics",label:"Analytics"},
     {id:"plan",label:"Race plan"},
+    {id:"settings",label:"Settings"},
   ];
 
   return (
     <div style={{background:T.bg,color:T.text,minHeight:"100vh",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontSize:14}}>
       {/* Header */}
-      <div style={{borderBottom:`1px solid ${T.border}`,padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
-        <div>
-          <div style={{fontSize:16,fontWeight:600}}>Gus — Ironman 70.3 WA 2027</div>
-          <div style={{fontSize:12,color:T.text3,marginTop:2}}>Sub 5:00 target · {cd.total} days · Phase: <span style={{color:phase.color}}>{phase.name}</span></div>
+      <div style={{borderBottom:`1px solid ${T.border}`,padding:"18px 24px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14,background:`linear-gradient(180deg, ${T.bg2} 0%, ${T.bg} 100%)`}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:48,height:48,borderRadius:12,background:`linear-gradient(135deg, ${T.teal}, ${T.blue})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#000",flexShrink:0,boxShadow:`0 4px 14px ${T.teal}33`}}>IC</div>
+          <div>
+            <div style={{fontSize:10,color:T.text3,textTransform:"uppercase",letterSpacing:".1em",fontWeight:700}}>Ironman 70.3 Western Australia · 5 Dec 2027</div>
+            <div style={{fontSize:20,fontWeight:700,marginTop:3,letterSpacing:"-.01em",color:T.text}}>Angus Nelson</div>
+            <div style={{fontSize:12,color:T.text2,marginTop:3}}>Sub 5:00 · <span style={{color:T.teal,fontWeight:700,fontSize:13}}>{cd.total}</span> days · Phase <span style={{color:phase.color,fontWeight:600}}>{phase.name}</span></div>
+          </div>
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           {syncMsg && <span style={{fontSize:12,color:syncMsg.startsWith("✓")?T.green:T.amber}}>{syncMsg}</span>}
           <Btn onClick={doSync} disabled={syncing} style={{borderColor:T.strava,color:T.strava,background:"transparent"}}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
@@ -470,6 +478,18 @@ export default function IronmanDashboard() {
 
         {/* ═══ RACE PLAN ═══ */}
         {tab === "plan" && <RacePlanTab/>}
+
+        {/* ═══ DIARY ═══ */}
+        {tab === "diary" && <DiaryTab diary={diary} setDiary={setDiary} />}
+
+        {/* ═══ SETTINGS ═══ */}
+        {tab === "settings" && <SettingsTab
+          lastSync={lastSync}
+          allSessions={allSessions}
+          diary={diary}
+          phase={phase}
+          daysToRace={cd.total}
+        />}
       </div>
 
       {/* ═══ LOG MODAL ═══ */}
@@ -621,6 +641,304 @@ function RacePlanTab() {
           ))}
         </div>
       </Card>
+    </div>
+  );
+}
+
+// ─── DIARY TAB ───────────────────────────────────────────────────────────────
+function DiaryTab({ diary, setDiary }) {
+  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [monthOffset, setMonthOffset] = useState(0);
+
+  const inputStyle = {width:"100%",background:T.bg3,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:"8px 12px",fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"};
+  const labelStyle = {fontSize:11,color:T.text3,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6,fontWeight:600};
+
+  const entry = diary[selectedDate] || {};
+  const setField = (k, v) => setDiary(d => ({...d, [selectedDate]: {...(d[selectedDate]||{}), [k]: v, updatedAt: new Date().toISOString()}}));
+  const clearEntry = () => setDiary(d => { const c = {...d}; delete c[selectedDate]; return c; });
+
+  // Build a 6-week calendar grid ending at the end of the current month-view
+  const viewMonth = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + monthOffset); return d; })();
+  const monthLabel = viewMonth.toLocaleDateString("default",{month:"long",year:"numeric"});
+  const firstOfMonth = new Date(viewMonth);
+  const startCol = (firstOfMonth.getDay() + 6) % 7; // Monday=0
+  const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth()+1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startCol; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d);
+    cells.push(dt.toISOString().split("T")[0]);
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const entries = Object.entries(diary).sort((a,b) => b[0].localeCompare(a[0]));
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:16}}>
+      {/* Calendar */}
+      <Card title="Calendar">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <button onClick={()=>setMonthOffset(m=>m-1)} style={{background:T.bg3,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:13}}>‹</button>
+          <span style={{fontSize:14,fontWeight:600}}>{monthLabel}</span>
+          <button onClick={()=>setMonthOffset(m=>m+1)} style={{background:T.bg3,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:13}}>›</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,fontSize:11,color:T.text3,marginBottom:6}}>
+          {["Mo","Tu","We","Th","Fr","Sa","Su"].map(d=><div key={d} style={{textAlign:"center"}}>{d}</div>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+          {cells.map((c,i) => {
+            if (!c) return <div key={i}/>;
+            const hasEntry = !!diary[c];
+            const isSelected = c === selectedDate;
+            const isToday = c === todayStr();
+            const day = parseInt(c.split("-")[2], 10);
+            return (
+              <button key={i} onClick={()=>setSelectedDate(c)} style={{
+                aspectRatio:"1",borderRadius:6,
+                background:isSelected?T.teal:hasEntry?T.tealDim:T.bg3,
+                border:isToday?`1px solid ${T.teal}`:`1px solid ${T.border}`,
+                color:isSelected?"#000":T.text,fontSize:13,fontWeight:isSelected?700:500,cursor:"pointer",
+                position:"relative",display:"flex",alignItems:"center",justifyContent:"center",
+              }}>
+                {day}
+                {hasEntry && !isSelected && <span style={{position:"absolute",bottom:3,width:4,height:4,borderRadius:"50%",background:T.teal}}/>}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{marginTop:14,fontSize:11,color:T.text3}}>
+          {Object.keys(diary).length} entries total · click any day to add or edit
+        </div>
+      </Card>
+
+      {/* Entry editor */}
+      <Card title={`Entry · ${selectedDate}`} accent={T.teal}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div>
+            <div style={labelStyle}>Mood (1-5)</div>
+            <div style={{display:"flex",gap:6}}>
+              {[1,2,3,4,5].map(n => (
+                <button key={n} onClick={()=>setField("mood",n)} style={{
+                  flex:1,padding:"8px 0",borderRadius:6,fontSize:13,
+                  background:entry.mood===n?T.teal:T.bg3,color:entry.mood===n?"#000":T.text,
+                  border:`1px solid ${entry.mood===n?T.teal:T.border}`,cursor:"pointer",fontWeight:600,
+                }}>{n}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={labelStyle}>RPE today (1-10)</div>
+            <input type="number" min="1" max="10" value={entry.rpe || ""} onChange={e=>setField("rpe", e.target.value ? +e.target.value : null)} style={inputStyle} placeholder="6"/>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div>
+            <div style={labelStyle}>Sleep (hrs)</div>
+            <input type="number" step="0.5" value={entry.sleep || ""} onChange={e=>setField("sleep", e.target.value ? +e.target.value : null)} style={inputStyle} placeholder="7.5"/>
+          </div>
+          <div style={{display:"flex",alignItems:"flex-end",paddingBottom:4}}>
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:T.text2,cursor:"pointer"}}>
+              <input type="checkbox" checked={!!entry.injury} onChange={e=>setField("injury", e.target.checked)} style={{accentColor:T.amber,width:16,height:16}}/>
+              <span>Injury flag {entry.injury && <span style={{color:T.amber}}>⚠</span>}</span>
+            </label>
+          </div>
+        </div>
+        <div style={{marginBottom:10}}>
+          <div style={labelStyle}>Body check</div>
+          <input value={entry.body || ""} onChange={e=>setField("body", e.target.value)} style={inputStyle} placeholder="e.g. tight calves, ankle OK, hip mobility good"/>
+        </div>
+        <div style={{marginBottom:10}}>
+          <div style={labelStyle}>Fuel / nutrition</div>
+          <input value={entry.fuel || ""} onChange={e=>setField("fuel", e.target.value)} style={inputStyle} placeholder="e.g. pre-swim oats + banana, 2x gel on bike"/>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={labelStyle}>Reflection</div>
+          <textarea rows={4} value={entry.reflection || ""} onChange={e=>setField("reflection", e.target.value)} style={{...inputStyle,resize:"vertical",fontFamily:"inherit"}} placeholder="How did training feel? What surprised you? Anything to flag for next week?"/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:11,color:T.text3}}>{entry.updatedAt ? `Saved ${new Date(entry.updatedAt).toLocaleString()}` : "Auto-saves as you type"}</span>
+          {Object.keys(entry).filter(k=>k!=="updatedAt").length > 0 && (
+            <button onClick={()=>{ if (confirm(`Delete entry for ${selectedDate}?`)) clearEntry(); }} style={{background:"transparent",border:"none",color:T.text3,fontSize:12,cursor:"pointer",textDecoration:"underline"}}>Delete entry</button>
+          )}
+        </div>
+      </Card>
+
+      {/* Recent entries list */}
+      {entries.length > 0 && (
+        <Card title={`Recent entries (${entries.length})`} style={{gridColumn:"1 / -1"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {entries.slice(0,8).map(([date,e]) => (
+              <button key={date} onClick={()=>setSelectedDate(date)} style={{
+                display:"flex",gap:12,alignItems:"center",padding:"10px 12px",background:T.bg3,
+                border:`1px solid ${T.border}`,borderRadius:8,cursor:"pointer",textAlign:"left",color:T.text,
+              }}>
+                <div style={{fontSize:12,color:T.text2,minWidth:90}}>{date}</div>
+                <div style={{display:"flex",gap:8,fontSize:12,color:T.text2,flexWrap:"wrap",flex:1}}>
+                  {e.mood && <span>Mood {e.mood}/5</span>}
+                  {e.sleep && <span>· {e.sleep}h sleep</span>}
+                  {e.rpe && <span>· RPE {e.rpe}</span>}
+                  {e.injury && <span style={{color:T.amber}}>· ⚠ injury</span>}
+                  {e.reflection && <span style={{color:T.text3,fontStyle:"italic",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:240}}>"{e.reflection.slice(0,60)}{e.reflection.length>60?"…":""}"</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── SETTINGS TAB ────────────────────────────────────────────────────────────
+function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace }) {
+  const [stravaStatus, setStravaStatus] = useState("checking");
+  const [copyMsg, setCopyMsg] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch("/api/strava/sync");
+        setStravaStatus(r.ok ? "connected" : "needs-setup");
+      } catch { setStravaStatus("error"); }
+    })();
+  }, []);
+
+  // Build a paste-ready summary for Claude conversations
+  const buildClaudeSummary = () => {
+    const today = todayStr();
+    const wkStart = weekStartOf(today);
+    const thisWk = allSessions.filter(s => weekStartOf(s.date) === wkStart);
+    const last7 = allSessions.filter(s => {
+      const d = new Date(s.date);
+      const diff = (new Date(today) - d) / 86400000;
+      return diff >= 0 && diff < 7;
+    });
+    const byType = {};
+    last7.forEach(s => { byType[s.type] = (byType[s.type] || 0) + 1; });
+    const recentDiary = Object.entries(diary).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,5);
+
+    let out = `=== IRONCOACH SUMMARY · ${today} ===\n`;
+    out += `Race: Ironman 70.3 WA, 5 Dec 2027 (${daysToRace} days away)\n`;
+    out += `Current phase: ${phase.name}\n\n`;
+    out += `LAST 7 DAYS (${last7.length} sessions, ${last7.reduce((a,s)=>a+(s.mins||0),0)} min total)\n`;
+    Object.entries(byType).forEach(([t,n]) => { out += `  ${t}: ${n}\n`; });
+    if (!last7.length) out += `  (no sessions logged)\n`;
+    out += `\nTHIS WEEK SO FAR (${thisWk.length} sessions)\n`;
+    thisWk.slice(0,10).forEach(s => {
+      out += `  ${s.date} · ${s.type} · ${s.name}`;
+      if (s.dist) out += ` · ${s.type==="Swim"?s.dist+"m":(s.dist/1000).toFixed(1)+"km"}`;
+      if (s.mins) out += ` · ${s.mins}min`;
+      out += `\n`;
+    });
+    if (recentDiary.length) {
+      out += `\nDIARY (last ${recentDiary.length})\n`;
+      recentDiary.forEach(([d,e]) => {
+        out += `  ${d}: `;
+        const bits = [];
+        if (e.mood) bits.push(`mood ${e.mood}/5`);
+        if (e.sleep) bits.push(`sleep ${e.sleep}h`);
+        if (e.rpe) bits.push(`RPE ${e.rpe}/10`);
+        if (e.injury) bits.push(`INJURY FLAG`);
+        out += bits.join(", ");
+        if (e.body) out += `\n    body: ${e.body}`;
+        if (e.reflection) out += `\n    "${e.reflection}"`;
+        out += `\n`;
+      });
+    }
+    return out;
+  };
+
+  const copySummary = async () => {
+    try {
+      await navigator.clipboard.writeText(buildClaudeSummary());
+      setCopyMsg("✓ Copied — paste into Claude");
+      setTimeout(() => setCopyMsg(""), 4000);
+    } catch (e) {
+      setCopyMsg("Copy failed: " + e.message);
+    }
+  };
+
+  const Section = ({ title, status, statusColor, statusLabel, children }) => (
+    <Card title={title}>
+      {status && (
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+          <span style={{width:8,height:8,borderRadius:"50%",background:statusColor,display:"inline-block"}}/>
+          <span style={{fontSize:13,color:T.text,fontWeight:500}}>{statusLabel}</span>
+        </div>
+      )}
+      {children}
+    </Card>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {/* Claude bridge */}
+      <Section title="Bridge to Claude">
+        <div style={{fontSize:13,color:T.text2,lineHeight:1.6,marginBottom:12}}>
+          One-click copy a summary of your training state — last 7 days of sessions, this week's plan, and recent diary entries — ready to paste into Claude for coaching feedback.
+        </div>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <Btn primary onClick={copySummary}>📋 Copy summary for Claude</Btn>
+          {copyMsg && <span style={{fontSize:12,color:copyMsg.startsWith("✓")?T.green:T.amber}}>{copyMsg}</span>}
+        </div>
+        <details style={{marginTop:14}}>
+          <summary style={{fontSize:12,color:T.text3,cursor:"pointer"}}>Preview what gets copied</summary>
+          <pre style={{background:T.bg3,padding:12,borderRadius:8,fontSize:11,marginTop:8,overflowX:"auto",border:`1px solid ${T.border}`,whiteSpace:"pre-wrap"}}>{buildClaudeSummary()}</pre>
+        </details>
+      </Section>
+
+      {/* Strava */}
+      <Section
+        title="Strava sync"
+        status
+        statusColor={stravaStatus==="connected"?T.green:stravaStatus==="checking"?T.amber:T.red}
+        statusLabel={stravaStatus==="connected"?"Connected — syncing live activities":stravaStatus==="checking"?"Checking…":"Not connected — see steps below"}
+      >
+        <div style={{fontSize:12,color:T.text3,marginBottom:10}}>Last manual sync: {lastSync}</div>
+        {stravaStatus !== "connected" && (
+          <ol style={{fontSize:13,color:T.text2,lineHeight:1.8,paddingLeft:20,marginBottom:12}}>
+            <li>Set <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4}}>STRAVA_CLIENT_ID</code>, <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4}}>STRAVA_CLIENT_SECRET</code> in Vercel env vars</li>
+            <li>Visit <a href="/api/strava/authorize" style={{color:T.teal}}>/api/strava/authorize</a> to grant access</li>
+            <li>Copy the printed refresh token to <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4}}>STRAVA_REFRESH_TOKEN</code> in Vercel</li>
+            <li>Redeploy</li>
+          </ol>
+        )}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <a href="/api/strava/authorize" style={{textDecoration:"none"}}><Btn small style={{borderColor:T.strava,color:T.strava,background:"transparent"}}>Re-authorize</Btn></a>
+        </div>
+      </Section>
+
+      {/* Google Calendar */}
+      <Section
+        title="Google Calendar export"
+        status
+        statusColor={T.amber}
+        statusLabel="Not connected yet — finish setup steps"
+      >
+        <div style={{fontSize:13,color:T.text2,lineHeight:1.7,marginBottom:12}}>
+          Push planner sessions to a Google Calendar so your training week shows up in your normal calendar alongside everything else.
+        </div>
+        <ol style={{fontSize:13,color:T.text2,lineHeight:1.8,paddingLeft:20,marginBottom:12}}>
+          <li>Create a Google Cloud project at <span style={{color:T.text3}}>console.cloud.google.com</span></li>
+          <li>Enable the <strong>Google Calendar API</strong></li>
+          <li>Create an OAuth 2.0 Client ID (Web application)</li>
+          <li>Add redirect URI: <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4,fontSize:11}}>https://iron-coach-delta.vercel.app/api/google/callback</code></li>
+          <li>Paste the Client ID + Secret back to Claude — he'll wire up the rest</li>
+        </ol>
+        <Btn disabled>Connect Google Calendar (set up first)</Btn>
+      </Section>
+
+      {/* Data storage */}
+      <Section
+        title="Data storage"
+        status
+        statusColor={T.amber}
+        statusLabel="Browser localStorage — single-device only"
+      >
+        <div style={{fontSize:13,color:T.text2,lineHeight:1.7,marginBottom:10}}>
+          Your diary, planner state, and manual logs currently live in this browser only. To make them follow you across devices, provision a Vercel Postgres database (Storage tab → Create Database → Neon). Once <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4}}>DATABASE_URL</code> is set, the next deploy will switch over automatically.
+        </div>
+      </Section>
     </div>
   );
 }
