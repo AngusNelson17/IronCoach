@@ -118,11 +118,9 @@ export default function IronmanDashboard() {
   const [activities, setActivities] = useState(SEED_ACTIVITIES);
   const [planner, setPlanner] = useState(DEFAULT_PLANNER);
   const [checked, setChecked] = useState({});   // {weekStart: {sessionId: true}}
-  const [manualLogs, setManualLogs] = useState([]);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
   const [lastSync, setLastSync] = useState("2026-06-10 (seed)");
-  const [showLog, setShowLog] = useState(false);
   const [diary, setDiary] = useState({});          // {dateStr: {mood, sleep, rpe, body, fuel, reflection, injury}}
   const [loaded, setLoaded] = useState(false);
 
@@ -133,7 +131,6 @@ export default function IronmanDashboard() {
       if (s) {
         if (s.activities?.length) setActivities(s.activities);
         if (s.checked) setChecked(s.checked);
-        if (s.manualLogs) setManualLogs(s.manualLogs);
         if (s.lastSync) setLastSync(s.lastSync);
         if (s.planner) setPlanner(s.planner);
         if (s.diary) setDiary(s.diary);
@@ -145,8 +142,8 @@ export default function IronmanDashboard() {
   // persist on change
   useEffect(() => {
     if (!loaded) return;
-    saveState({ activities, checked, manualLogs, lastSync, planner, diary });
-  }, [activities, checked, manualLogs, lastSync, planner, diary, loaded]);
+    saveState({ activities, checked, lastSync, planner, diary });
+  }, [activities, checked, lastSync, planner, diary, loaded]);
 
   const doSync = useCallback(async () => {
     setSyncing(true);
@@ -169,7 +166,7 @@ export default function IronmanDashboard() {
     setTimeout(() => setSyncMsg(""), 6000);
   }, [activities]);
 
-  const allSessions = [...activities, ...manualLogs].sort((a,b)=>b.date.localeCompare(a.date));
+  const allSessions = [...activities].sort((a,b)=>b.date.localeCompare(a.date));
   const thisWeekStart = weekStartOf(todayStr());
   const thisWeek = allSessions.filter(s => weekStartOf(s.date) === thisWeekStart);
   const phase = currentPhase();
@@ -223,7 +220,6 @@ export default function IronmanDashboard() {
             <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
             {syncing ? "Syncing…" : "Sync Strava"}
           </Btn>
-          <Btn primary onClick={() => setShowLog(true)}>+ Log</Btn>
         </div>
       </div>
 
@@ -371,7 +367,7 @@ export default function IronmanDashboard() {
         {tab === "feed" && (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div style={{fontSize:13,color:T.text2}}>{allSessions.length} activities · Strava + manual</div>
+              <div style={{fontSize:13,color:T.text2}}>{allSessions.length} activities · Strava</div>
               <Btn small onClick={doSync} disabled={syncing} style={{borderColor:T.strava,color:T.strava,background:"transparent"}}>
                 {syncing ? "Syncing…" : "↻ Sync Strava"}
               </Btn>
@@ -464,12 +460,6 @@ export default function IronmanDashboard() {
           thisWeekStart={thisWeekStart}
         />}
       </div>
-
-      {/* ═══ LOG MODAL ═══ */}
-      {showLog && <LogModal
-        onClose={()=>setShowLog(false)}
-        onSave={(s)=>{ setManualLogs(m=>[...m,s]); setShowLog(false); }}
-      />}
     </div>
   );
 }
@@ -496,42 +486,6 @@ function ActivityRow({ a, detailed }) {
   );
 }
 
-// ─── LOG MODAL ───────────────────────────────────────────────────────────────
-function LogModal({ onClose, onSave }) {
-  const [f, setF] = useState({date:todayStr(),type:"Swim",name:"",mins:"",dist:"",notes:""});
-  const set = (k,v) => setF(p=>({...p,[k]:v}));
-  const inputStyle = {width:"100%",background:T.bg3,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:"8px 12px",fontSize:14,outline:"none",boxSizing:"border-box"};
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:T.bg2,border:`1px solid ${T.border}`,borderRadius:14,padding:24,width:"100%",maxWidth:440}}>
-        <div style={{fontSize:16,fontWeight:600,marginBottom:18,display:"flex",justifyContent:"space-between"}}>
-          Log session
-          <button onClick={onClose} style={{background:"none",border:"none",color:T.text3,cursor:"pointer",fontSize:18}}>×</button>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-          <div><div style={{fontSize:12,color:T.text2,marginBottom:5}}>Date</div><input type="date" value={f.date} onChange={e=>set("date",e.target.value)} style={inputStyle}/></div>
-          <div><div style={{fontSize:12,color:T.text2,marginBottom:5}}>Type</div>
-            <select value={f.type} onChange={e=>set("type",e.target.value)} style={inputStyle}>
-              {["Swim","Bike","Run","Gym","Row","Walk","Brick","Football"].map(t=><option key={t}>{t}</option>)}
-            </select>
-          </div>
-        </div>
-        <div style={{marginBottom:10}}><div style={{fontSize:12,color:T.text2,marginBottom:5}}>Name</div><input placeholder="e.g. Squad swim — hard set" value={f.name} onChange={e=>set("name",e.target.value)} style={inputStyle}/></div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-          <div><div style={{fontSize:12,color:T.text2,marginBottom:5}}>Duration (min)</div><input type="number" placeholder="45" value={f.mins} onChange={e=>set("mins",e.target.value)} style={inputStyle}/></div>
-          <div><div style={{fontSize:12,color:T.text2,marginBottom:5}}>Distance (m)</div><input type="number" placeholder="2000" value={f.dist} onChange={e=>set("dist",e.target.value)} style={inputStyle}/></div>
-        </div>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <Btn onClick={onClose}>Cancel</Btn>
-          <Btn primary onClick={()=>{
-            if(!f.mins&&!f.dist)return;
-            onSave({id:`m${Date.now()}`,name:f.name||`${f.type} session`,type:f.type,date:f.date,dist:+f.dist||0,mins:+f.mins||0,cal:0,src:"manual"});
-          }}>Save</Btn>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── RACE PLAN TAB ───────────────────────────────────────────────────────────
 function RacePlanTab() {
@@ -1013,7 +967,7 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
         statusLabel="Browser localStorage — single-device only"
       >
         <div style={{fontSize:13,color:T.text2,lineHeight:1.7,marginBottom:10}}>
-          Your diary, planner state, and manual logs currently live in this browser only. To make them follow you across devices, provision a Vercel Postgres database (Storage tab → Create Database → Neon). Once <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4}}>DATABASE_URL</code> is set, the next deploy will switch over automatically.
+          Your diary and planner state currently live in this browser only. To make them follow you across devices, provision a Vercel Postgres database (Storage tab → Create Database → Neon). Once <code style={{background:T.bg3,padding:"1px 6px",borderRadius:4}}>DATABASE_URL</code> is set, the next deploy will switch over automatically.
         </div>
       </Section>
     </div>
