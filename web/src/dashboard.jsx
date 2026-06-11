@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { DEFAULT_PLANNER, plannerToCalendarEvents, APP_TIMEZONE } from "./data/planner.js";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const T = {
@@ -39,47 +40,8 @@ const SEED_ACTIVITIES = [
   {id:"18524335318",name:"Shake Out",type:"Run",date:"2026-05-16",dist:5429,mins:26,cal:578,src:"strava"},
 ];
 
-// ─── WEEKLY PLANNER TEMPLATE (from Gus's 2026 planner PDF) ──────────────────
-// Each session has explicit time (24h) + duration so calendar push lands on
-// the right slots. Sunday-start week to match weekStartOf() Monday-anchored
-// indexing in SettingsTab.plannerToEvents (Monday=0, …, Sunday=6).
-const DEFAULT_PLANNER = [
-  {day:"Monday", sessions:[
-    {id:"mon1", label:"Bike commute → South Yarra",                type:"Bike",  time:"07:00", mins:60},
-    {id:"mon2", label:"Gym — Upper A (Anytime Fitness South Yarra)", type:"Gym", time:"08:00", mins:60},
-    {id:"mon3", label:"Bike commute → home",                       type:"Bike",  time:"17:00", mins:30},
-    {id:"mon4", label:"Swim",                                      type:"Swim",  time:"20:00", mins:60},
-  ]},
-  {day:"Tuesday", sessions:[
-    {id:"tue1", label:"Morning walk",                              type:"Walk",  time:"06:30", mins:30},
-    {id:"tue2", label:"Ride to work",                              type:"Bike",  time:"08:15", mins:30},
-    {id:"tue3", label:"Ride home",                                 type:"Bike",  time:"17:00", mins:30},
-    {id:"tue4", label:"Gym — Lower B (Anytime Fitness Kew)",       type:"Gym",   time:"17:30", mins:60},
-  ]},
-  {day:"Wednesday", sessions:[
-    {id:"wed1", label:"Bike commute → South Yarra",                type:"Bike",  time:"07:00", mins:60},
-    {id:"wed2", label:"Gym — Upper B (Anytime Fitness South Yarra)", type:"Gym", time:"08:00", mins:60},
-    {id:"wed3", label:"Bike commute → home",                       type:"Bike",  time:"17:00", mins:30},
-    {id:"wed4", label:"Swim",                                      type:"Swim",  time:"20:00", mins:60},
-  ]},
-  {day:"Thursday", sessions:[
-    {id:"thu1", label:"Gym — Lower B (Anytime Fitness Kew)",       type:"Gym",   time:"07:00", mins:60},
-    {id:"thu2", label:"Ride to work",                              type:"Bike",  time:"08:15", mins:30},
-    {id:"thu3", label:"Ride home",                                 type:"Bike",  time:"17:00", mins:30},
-    {id:"thu4", label:"Footy training",                            type:"Football", time:"18:00", mins:90, caution:true},
-  ]},
-  {day:"Friday", sessions:[
-    {id:"fri1", label:"2-hour bike session",                       type:"Bike",  time:"06:00", mins:120},
-    {id:"fri2", label:"45-min run session",                        type:"Run",   time:"08:15", mins:45, caution:true},
-  ]},
-  {day:"Saturday", sessions:[
-    {id:"sat1", label:"Stretching / Pilates (Week A)",             type:"Mobility", time:"09:00", mins:45},
-    {id:"sat2", label:"Bike ride with Dad (Week B)",               type:"Bike",     time:"07:00", mins:120},
-  ]},
-  {day:"Sunday", sessions:[
-    {id:"sun1", label:"Long run",                                  type:"Run",   time:"08:00", mins:120, caution:true},
-  ]},
-];
+// DEFAULT_PLANNER + plannerToCalendarEvents live in ./data/planner.js so the
+// Vercel cron sync (web/api/google/cron-sync.js) can import the same data.
 
 const PHASES = [
   {id:"recovery",name:"Recovery",start:"2026-06-03",end:"2026-08-09",color:T.teal},
@@ -827,30 +789,11 @@ function SettingsTab({ lastSync, allSessions, diary, phase, daysToRace, planner,
   const [syncTarget, setSyncTarget] = useState("this"); // "this" | "next"
 
   // Convert a given week's planner into tagged calendar events.
-  // weekStartISO is YYYY-MM-DD (Monday). Each event carries the session's
-  // stable id so the backend can reconcile (create/update/delete) on re-sync.
+  // Uses the shared helper so manual sync and cron sync produce identical
+  // events for the same planner + weekStart.
   const plannerToEvents = (weekStartISO) => {
-    const dayIdx = {Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4,Saturday:5,Sunday:6};
-    const base = new Date(`${weekStartISO}T00:00:00`);
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Australia/Melbourne";
-    const events = [];
-    planner.forEach(day => {
-      const d = new Date(base); d.setDate(base.getDate() + (dayIdx[day.day] ?? 0));
-      day.sessions.forEach(s => {
-        const [hh, mm] = (s.time || "07:00").split(":").map(Number);
-        const dur = s.mins || 60;
-        const start = new Date(d); start.setHours(hh, mm || 0, 0, 0);
-        const end = new Date(start); end.setMinutes(end.getMinutes() + dur);
-        events.push({
-          sessionId: s.id,
-          summary: `🏃 ${s.label}`,
-          description: `IronCoach planner · ${s.type}${s.caution ? "\n⚠ Wait for physio clearance" : ""}`,
-          start: { dateTime: start.toISOString(), timeZone: tz },
-          end: { dateTime: end.toISOString(), timeZone: tz },
-        });
-      });
-    });
-    return events;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || APP_TIMEZONE;
+    return plannerToCalendarEvents(planner, weekStartISO, tz);
   };
 
   const targetWeekStart = (() => {
