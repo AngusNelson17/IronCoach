@@ -3,18 +3,43 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { DEFAULT_PLANNER, plannerToCalendarEvents, APP_TIMEZONE } from "./data/planner.js";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
+// Wahoo-SYSTM-ish dark palette: deep near-black bases, brighter saturated
+// accents, refined neutrals between them.
 const T = {
-  bg:"#0f0f10", bg2:"#1a1a1c", bg3:"#222226", bg4:"#2a2a2f",
-  border:"#333338", border2:"#444449",
-  text:"#f0f0f0", text2:"#a0a0a8", text3:"#666670",
-  teal:"#1db896", tealDim:"#0d2820",
-  blue:"#4a9eff", blueDim:"#0d1f3c",
+  bg:"#08080a", bg2:"#101013", bg3:"#16161b", bg4:"#1f1f25",
+  border:"#22222a", border2:"#33333d",
+  text:"#fafafa", text2:"#a8a8b3", text3:"#646470",
+  teal:"#00d4aa", tealDim:"#003832",
+  blue:"#3b82f6", blueDim:"#0a1e3a",
   amber:"#f59e0b", amberDim:"#2a1f00",
   red:"#ef4444", redDim:"#2a0f0f",
   purple:"#a78bfa", purpleDim:"#1a1030",
   green:"#22c55e", greenDim:"#0a2010",
   strava:"#fc4c02",
 };
+
+// ─── SPORT ICONS (line art, scale to currentColor) ──────────────────────────
+const SPORT_ICON_PATHS = {
+  Swim: "M2 16c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 10c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2",
+  Bike: "M5.5 17.5a3 3 0 100-6 3 3 0 000 6zM18.5 17.5a3 3 0 100-6 3 3 0 000 6zM14.5 14.5l-3-7-3 3 3 3M11 4h3M8 7h4",
+  Run:  "M13 4a2 2 0 11-4 0 2 2 0 014 0zM6.5 18l2-4 2-1 1-4 3 1 3 3-2 2-2-1M11 22l-2-5",
+  Gym:  "M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12",
+  Row:  "M3 17l3-1 4 4 12-8-3-3-5 3-3-3-5 3-3 5z",
+  Walk: "M13 4a2 2 0 11-4 0 2 2 0 014 0zM9 22l-1-7 2-3-1-5 3-1 3 3-1 4 3 4",
+  Football: "M12 2a10 10 0 100 20 10 10 0 000-20zM12 7l-3 3 1 4 4 1 3-3-1-4z",
+  Mobility: "M12 6a2 2 0 100-4 2 2 0 000 4zM7 22l3-9 4 4 3-1M11 13l-2-5",
+  Brick: "M3 6h18v4H3zM3 14h18v4H3z",
+  Other: "M12 2v20M2 12h20",
+};
+function SportIcon({ type, size = 18, style }) {
+  const d = SPORT_ICON_PATHS[type] || SPORT_ICON_PATHS.Other;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <path d={d}/>
+    </svg>
+  );
+}
 
 const RACE_DATE = new Date("2027-12-05");
 const STORAGE_KEY = "gus-ironman-dashboard";
@@ -90,25 +115,47 @@ async function syncStrava() {
 }
 
 // ─── SMALL COMPONENTS ────────────────────────────────────────────────────────
-const Card = ({ title, children, accent, style }) => (
-  <div style={{background:T.bg2,border:`1px solid ${T.border}`,borderLeft:accent?`3px solid ${accent}`:`1px solid ${T.border}`,borderRadius:10,padding:"16px 18px",...style}}>
-    {title && <div style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:T.text3,marginBottom:12}}>{title}</div>}
+const Card = ({ title, children, accent, style, hoverable = true, eyebrow }) => (
+  <div className={hoverable ? "card-hover" : ""} style={{
+    background:T.bg2,
+    border:`1px solid ${T.border}`,
+    borderLeft:accent?`3px solid ${accent}`:`1px solid ${T.border}`,
+    borderRadius:12,
+    padding:"18px 20px",
+    boxShadow:"0 1px 0 rgba(255,255,255,0.02) inset, 0 8px 24px -16px rgba(0,0,0,0.6)",
+    ...style
+  }}>
+    {(title || eyebrow) && (
+      <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14}}>
+        {title && <div className="eyebrow">{title}</div>}
+        {eyebrow && <div style={{fontSize:11,color:T.text3,fontWeight:500}}>{eyebrow}</div>}
+      </div>
+    )}
     {children}
   </div>
 );
 
 const Badge = ({ children, color, dim }) => (
-  <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,fontSize:11,fontWeight:600,background:dim,color}}>{children}</span>
+  <span style={{
+    display:"inline-flex",alignItems:"center",gap:4,
+    padding:"3px 10px",borderRadius:999,
+    fontSize:10.5,fontWeight:700,letterSpacing:".02em",
+    background:dim,color,
+    border:`1px solid ${color}22`,
+  }}>{children}</span>
 );
 
 const Btn = ({ children, onClick, primary, small, disabled, style }) => (
   <button onClick={onClick} disabled={disabled} style={{
-    display:"inline-flex",alignItems:"center",gap:6,
-    padding:small?"5px 11px":"8px 16px",borderRadius:6,
-    fontSize:small?12:13,fontWeight:500,cursor:disabled?"default":"pointer",
+    display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,
+    padding:small?"6px 12px":"9px 18px",borderRadius:8,
+    fontSize:small?12:13,fontWeight:600,letterSpacing:".01em",
+    cursor:disabled?"default":"pointer",
     border:`1px solid ${primary?T.teal:T.border}`,
     background:primary?T.teal:T.bg3,color:primary?"#000":T.text,
-    opacity:disabled?0.5:1,...style
+    opacity:disabled?0.45:1,
+    boxShadow:primary?`0 6px 16px -8px ${T.teal}99`:"none",
+    ...style
   }}>{children}</button>
 );
 
@@ -203,18 +250,39 @@ export default function IronmanDashboard() {
   ];
 
   return (
-    <div style={{background:T.bg,color:T.text,minHeight:"100vh",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",fontSize:14}}>
+    <div style={{color:T.text,minHeight:"100vh",fontSize:14}}>
       {/* Header */}
-      <div style={{borderBottom:`1px solid ${T.border}`,padding:"18px 24px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14,background:`linear-gradient(180deg, ${T.bg2} 0%, ${T.bg} 100%)`}}>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:48,height:48,borderRadius:12,background:`linear-gradient(135deg, ${T.teal}, ${T.blue})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#000",flexShrink:0,boxShadow:`0 4px 14px ${T.teal}33`}}>IC</div>
+      <div className="header-hero" style={{
+        borderBottom:`1px solid ${T.border}`,
+        padding:"22px 28px 18px",
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        flexWrap:"wrap",gap:16,
+        background:`linear-gradient(180deg, ${T.bg2} 0%, ${T.bg} 100%)`,
+        position:"sticky",top:0,zIndex:50,
+        backdropFilter:"blur(8px)",
+      }}>
+        <div style={{display:"flex",alignItems:"center",gap:16}}>
+          <div style={{
+            width:52,height:52,borderRadius:14,
+            background:`linear-gradient(135deg, ${T.teal} 0%, ${T.blue} 100%)`,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:20,fontWeight:800,color:"#000",flexShrink:0,
+            boxShadow:`0 8px 22px -8px ${T.teal}77`,
+            letterSpacing:"-.02em",
+          }}>IC</div>
           <div>
-            <div style={{fontSize:10,color:T.text3,textTransform:"uppercase",letterSpacing:".1em",fontWeight:700}}>Ironman 70.3 Western Australia · 5 Dec 2027</div>
-            <div style={{fontSize:20,fontWeight:700,marginTop:3,letterSpacing:"-.01em",color:T.text}}>Angus Nelson</div>
-            <div style={{fontSize:12,color:T.text2,marginTop:3}}>Sub 5:00 · <span style={{color:T.teal,fontWeight:700,fontSize:13}}>{cd.total}</span> days · Phase <span style={{color:phase.color,fontWeight:600}}>{phase.name}</span></div>
+            <div className="eyebrow" style={{color:T.text3}}>Ironman 70.3 Western Australia · 5 Dec 2027</div>
+            <div style={{fontSize:22,fontWeight:800,marginTop:3,letterSpacing:"-.02em",color:T.text}}>Angus Nelson</div>
+            <div style={{fontSize:12.5,color:T.text2,marginTop:4,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <span>Sub 5:00 target</span>
+              <span style={{color:T.border2}}>·</span>
+              <span className="tabular" style={{color:T.teal,fontWeight:700,fontSize:13.5}}>{cd.total} days</span>
+              <span style={{color:T.border2}}>·</span>
+              <span>Phase <span style={{color:phase.color,fontWeight:700}}>{phase.name}</span></span>
+            </div>
           </div>
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
           {syncMsg && <span style={{fontSize:12,color:syncMsg.startsWith("✓")?T.green:T.amber}}>{syncMsg}</span>}
           <Btn onClick={doSync} disabled={syncing} style={{borderColor:T.strava,color:T.strava,background:"transparent"}}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
@@ -223,30 +291,49 @@ export default function IronmanDashboard() {
         </div>
       </div>
 
-      {/* Tab nav */}
-      <div style={{display:"flex",gap:4,padding:"12px 24px 0",borderBottom:`1px solid ${T.border}`,overflowX:"auto"}}>
+      {/* Tab nav — pill style, sticky under header */}
+      <div style={{
+        display:"flex",gap:4,padding:"10px 28px",
+        borderBottom:`1px solid ${T.border}`,
+        overflowX:"auto",alignItems:"center",
+        background:`${T.bg}cc`,
+        backdropFilter:"blur(6px)",
+        position:"sticky",top:104,zIndex:40,
+      }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{
-            padding:"9px 16px",fontSize:13,cursor:"pointer",background:"transparent",
-            border:"none",borderBottom:tab===t.id?`2px solid ${T.teal}`:"2px solid transparent",
-            color:tab===t.id?T.teal:T.text2,fontWeight:tab===t.id?600:400,whiteSpace:"nowrap"
+          <button key={t.id} onClick={()=>setTab(t.id)} className="tab-pill" style={{
+            padding:"8px 14px",fontSize:13,cursor:"pointer",
+            background:tab===t.id?`${T.teal}1a`:"transparent",
+            border:`1px solid ${tab===t.id?`${T.teal}44`:"transparent"}`,
+            borderRadius:8,
+            color:tab===t.id?T.teal:T.text2,
+            fontWeight:tab===t.id?700:500,whiteSpace:"nowrap",letterSpacing:".01em",
           }}>{t.label}</button>
         ))}
-        <div style={{marginLeft:"auto",fontSize:11,color:T.text3,padding:"10px 0",whiteSpace:"nowrap"}}>Last sync: {lastSync}</div>
+        <div className="hide-mobile" style={{marginLeft:"auto",fontSize:11,color:T.text3,padding:"8px 0",whiteSpace:"nowrap"}}>
+          Last sync: <span className="tabular">{lastSync}</span>
+        </div>
       </div>
 
-      <div style={{padding:24,maxWidth:1100,margin:"0 auto"}}>
+      <div className="content-pad" style={{padding:"24px 28px",maxWidth:1200,margin:"0 auto"}}>
 
         {/* ═══ DASHBOARD ═══ */}
         {tab === "dashboard" && (
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
             {/* Countdown + phase bar */}
-            <Card title="Race countdown">
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:14}}>
-                {[[cd.months,"Months"],[cd.weeks,"Weeks"],[cd.days,"Days"],[cd.total,"Total days"]].map(([v,l])=>(
-                  <div key={l} style={{background:T.bg3,borderRadius:6,padding:"12px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:24,fontWeight:700,color:T.teal,lineHeight:1}}>{v}</div>
-                    <div style={{fontSize:10,color:T.text3,textTransform:"uppercase",letterSpacing:".06em",marginTop:4}}>{l}</div>
+            <Card title="Race countdown" eyebrow="Busselton WA · 5 Dec 2027">
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18}}>
+                {[[cd.months,"Months"],[cd.weeks,"Weeks"],[cd.days,"Days"],[cd.total,"Total days"]].map(([v,l],i)=>(
+                  <div key={l} style={{
+                    background:`linear-gradient(160deg, ${T.bg3} 0%, ${T.bg2} 100%)`,
+                    border:`1px solid ${T.border}`,
+                    borderRadius:10,padding:"16px 10px",textAlign:"center",
+                  }}>
+                    <div className="tabular metric-num" style={{
+                      fontSize:i===3?36:32,fontWeight:800,
+                      color:i===3?T.teal:T.text,lineHeight:1,letterSpacing:"-.02em",
+                    }}>{v}</div>
+                    <div className="eyebrow" style={{marginTop:6,color:T.text3}}>{l}</div>
                   </div>
                 ))}
               </div>
@@ -395,9 +482,15 @@ export default function IronmanDashboard() {
                   {l:"Bike",v:tot.Bike.toFixed(0),u:"km",c:T.teal},
                   {l:"Run",v:tot.Run.toFixed(0),u:"km",c:T.purple},
                 ].map(m=>(
-                  <div key={m.l} style={{background:T.bg2,border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 16px"}}>
-                    <div style={{fontSize:11,color:T.text3,textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>{m.l}</div>
-                    <div style={{fontSize:24,fontWeight:600,color:m.c}}>{m.v}<span style={{fontSize:13,color:T.text2,fontWeight:400}}>{m.u}</span></div>
+                  <div key={m.l} className="card-hover" style={{
+                    background:`linear-gradient(160deg, ${T.bg2} 0%, ${T.bg3} 100%)`,
+                    border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 18px",
+                    boxShadow:"0 1px 0 rgba(255,255,255,0.02) inset",
+                  }}>
+                    <div className="eyebrow" style={{color:T.text3,marginBottom:8}}>{m.l}</div>
+                    <div className="tabular metric-num" style={{fontSize:28,fontWeight:800,color:m.c,letterSpacing:"-.02em",lineHeight:1}}>
+                      {m.v}<span style={{fontSize:13,color:T.text3,fontWeight:600,marginLeft:3}}>{m.u}</span>
+                    </div>
                   </div>
                 ));
               })()}
@@ -407,10 +500,10 @@ export default function IronmanDashboard() {
               <div style={{width:"100%",height:220}}>
                 <ResponsiveContainer>
                   <BarChart data={weeklyData}>
-                    <CartesianGrid stroke={T.border} strokeDasharray="3 3"/>
-                    <XAxis dataKey="label" tick={{fill:T.text3,fontSize:11}} stroke={T.border}/>
-                    <YAxis tick={{fill:T.text3,fontSize:11}} stroke={T.border}/>
-                    <Tooltip contentStyle={{background:T.bg3,border:`1px solid ${T.border}`,borderRadius:6,fontSize:12}} labelStyle={{color:T.text}}/>
+                    <CartesianGrid stroke={T.border} strokeDasharray="2 4" vertical={false}/>
+                    <XAxis dataKey="label" tick={{fill:T.text3,fontSize:11}} stroke="transparent" tickLine={false}/>
+                    <YAxis tick={{fill:T.text3,fontSize:11}} stroke="transparent" tickLine={false} width={32}/>
+                    <Tooltip contentStyle={{background:T.bg2,border:`1px solid ${T.border2}`,borderRadius:8,fontSize:12,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}} labelStyle={{color:T.text,fontWeight:600,marginBottom:4}} cursor={{fill:`${T.text}08`}}/>
                     <Bar dataKey="Swim" fill={T.blue} radius={[2,2,0,0]}/>
                     <Bar dataKey="Bike" fill={T.teal} radius={[2,2,0,0]}/>
                     <Bar dataKey="Run" fill={T.purple} radius={[2,2,0,0]}/>
@@ -430,10 +523,10 @@ export default function IronmanDashboard() {
               <div style={{width:"100%",height:200}}>
                 <ResponsiveContainer>
                   <LineChart data={weeklyData}>
-                    <CartesianGrid stroke={T.border} strokeDasharray="3 3"/>
-                    <XAxis dataKey="label" tick={{fill:T.text3,fontSize:11}} stroke={T.border}/>
-                    <YAxis tick={{fill:T.text3,fontSize:11}} stroke={T.border}/>
-                    <Tooltip contentStyle={{background:T.bg3,border:`1px solid ${T.border}`,borderRadius:6,fontSize:12}} labelStyle={{color:T.text}}/>
+                    <CartesianGrid stroke={T.border} strokeDasharray="2 4" vertical={false}/>
+                    <XAxis dataKey="label" tick={{fill:T.text3,fontSize:11}} stroke="transparent" tickLine={false}/>
+                    <YAxis tick={{fill:T.text3,fontSize:11}} stroke="transparent" tickLine={false} width={32}/>
+                    <Tooltip contentStyle={{background:T.bg2,border:`1px solid ${T.border2}`,borderRadius:8,fontSize:12,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}} labelStyle={{color:T.text,fontWeight:600,marginBottom:4}} cursor={{fill:`${T.text}08`}}/>
                     <Line type="monotone" dataKey="hrs" stroke={T.teal} strokeWidth={2} dot={{fill:T.teal,r:4}}/>
                   </LineChart>
                 </ResponsiveContainer>
@@ -467,13 +560,28 @@ export default function IronmanDashboard() {
 // ─── ACTIVITY ROW ────────────────────────────────────────────────────────────
 function ActivityRow({ a, detailed }) {
   return (
-    <div style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:T.bg2,border:`1px solid ${T.border}`,borderLeft:a.src==="strava"?`3px solid ${T.strava}`:`3px solid ${T.border2}`,borderRadius:8,marginBottom:6}}>
-      <div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",background:typeDim(a.type),color:typeColor(a.type),fontSize:11,fontWeight:700,flexShrink:0}}>
-        {a.type.slice(0,2).toUpperCase()}
+    <div className="card-hover" style={{
+      display:"flex",alignItems:"center",gap:14,
+      padding:"14px 16px",
+      background:T.bg2,
+      border:`1px solid ${T.border}`,
+      borderLeft:a.src==="strava"?`3px solid ${T.strava}`:`3px solid ${T.border2}`,
+      borderRadius:10,marginBottom:8,
+    }}>
+      <div style={{
+        width:40,height:40,borderRadius:10,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        background:typeDim(a.type),color:typeColor(a.type),
+        border:`1px solid ${typeColor(a.type)}33`,flexShrink:0,
+      }}>
+        <SportIcon type={a.type} size={20}/>
       </div>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}{a.note && <span style={{color:T.red,fontSize:11,marginLeft:8}}>· {a.note}</span>}</div>
-        <div style={{fontSize:12,color:T.text3,display:"flex",gap:10,flexWrap:"wrap"}}>
+        <div style={{fontSize:13.5,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",letterSpacing:"-.005em"}}>
+          {a.name}
+          {a.note && <span style={{color:T.red,fontSize:11,marginLeft:8,fontWeight:500}}>· {a.note}</span>}
+        </div>
+        <div className="tabular" style={{fontSize:12,color:T.text3,display:"flex",gap:12,flexWrap:"wrap",marginTop:3}}>
           <span>{a.date}</span>
           {a.mins ? <span>{a.mins} min</span> : null}
           {fmtDist(a.dist, a.type) && <span>{fmtDist(a.dist, a.type)}</span>}
