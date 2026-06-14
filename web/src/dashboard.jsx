@@ -3,19 +3,25 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { DEFAULT_PLANNER, plannerToCalendarEvents, APP_TIMEZONE } from "./data/planner.js";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
-// Wahoo-SYSTM-ish dark palette: deep near-black bases, brighter saturated
-// accents, refined neutrals between them.
+// Strava-inspired light palette: white cards on warm-gray bg, Strava orange
+// as the primary accent, deeper sport colours that read on white.
 const T = {
-  bg:"#08080a", bg2:"#101013", bg3:"#16161b", bg4:"#1f1f25",
-  border:"#22222a", border2:"#33333d",
-  text:"#fafafa", text2:"#a8a8b3", text3:"#646470",
-  teal:"#00d4aa", tealDim:"#003832",
-  blue:"#3b82f6", blueDim:"#0a1e3a",
-  amber:"#f59e0b", amberDim:"#2a1f00",
-  red:"#ef4444", redDim:"#2a0f0f",
-  purple:"#a78bfa", purpleDim:"#1a1030",
-  green:"#22c55e", greenDim:"#0a2010",
-  strava:"#fc4c02",
+  bg:"#f7f7fa",        // app bg
+  bg2:"#ffffff",       // card bg
+  bg3:"#fafafb",       // input / subtle bg
+  bg4:"#eeeef2",       // hover surface
+  border:"#e5e5ea",
+  border2:"#d1d1d6",
+  text:"#1c1c1e",      // near-black
+  text2:"#4a4a4f",     // medium gray
+  text3:"#8e8e93",     // muted gray
+  teal:"#00a572",   tealDim:"#e0f5ee",
+  blue:"#2563eb",   blueDim:"#e0ebff",
+  amber:"#d97706",  amberDim:"#fff4e5",
+  red:"#dc2626",    redDim:"#fee2e2",
+  purple:"#7c3aed", purpleDim:"#f0eaff",
+  green:"#16a34a",  greenDim:"#e0f5e5",
+  strava:"#fc4c02", stravaDim:"#fff1eb",
 };
 
 // ─── SPORT ICONS (line art, scale to currentColor) ──────────────────────────
@@ -116,13 +122,12 @@ async function syncStrava() {
 
 // ─── SMALL COMPONENTS ────────────────────────────────────────────────────────
 const Card = ({ title, children, accent, style, hoverable = true, eyebrow }) => (
-  <div className={hoverable ? "card-hover" : ""} style={{
+  <div className={`card-shadow ${hoverable ? "card-hover" : ""}`} style={{
     background:T.bg2,
     border:`1px solid ${T.border}`,
     borderLeft:accent?`3px solid ${accent}`:`1px solid ${T.border}`,
     borderRadius:12,
     padding:"18px 20px",
-    boxShadow:"0 1px 0 rgba(255,255,255,0.02) inset, 0 8px 24px -16px rgba(0,0,0,0.6)",
     ...style
   }}>
     {(title || eyebrow) && (
@@ -141,7 +146,6 @@ const Badge = ({ children, color, dim }) => (
     padding:"3px 10px",borderRadius:999,
     fontSize:10.5,fontWeight:700,letterSpacing:".02em",
     background:dim,color,
-    border:`1px solid ${color}22`,
   }}>{children}</span>
 );
 
@@ -149,12 +153,13 @@ const Btn = ({ children, onClick, primary, small, disabled, style }) => (
   <button onClick={onClick} disabled={disabled} style={{
     display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,
     padding:small?"6px 12px":"9px 18px",borderRadius:8,
-    fontSize:small?12:13,fontWeight:600,letterSpacing:".01em",
+    fontSize:small?12:13,fontWeight:700,letterSpacing:".01em",
     cursor:disabled?"default":"pointer",
-    border:`1px solid ${primary?T.teal:T.border}`,
-    background:primary?T.teal:T.bg3,color:primary?"#000":T.text,
+    border:primary?"1px solid transparent":`1px solid ${T.border2}`,
+    background:primary?T.strava:T.bg2,
+    color:primary?"#fff":T.text,
     opacity:disabled?0.45:1,
-    boxShadow:primary?`0 6px 16px -8px ${T.teal}99`:"none",
+    boxShadow:primary?"0 1px 2px rgba(252,76,2,0.25), 0 2px 8px -2px rgba(252,76,2,0.3)":"0 1px 2px rgba(0,0,0,0.04)",
     ...style
   }}>{children}</button>
 );
@@ -251,66 +256,66 @@ export default function IronmanDashboard() {
 
   return (
     <div style={{color:T.text,minHeight:"100vh",fontSize:14}}>
-      {/* Header */}
+      {/* Header — Strava style: white bg, black text, orange accent */}
       <div className="header-hero" style={{
         borderBottom:`1px solid ${T.border}`,
-        padding:"22px 28px 18px",
+        padding:"18px 28px 16px",
         display:"flex",alignItems:"center",justifyContent:"space-between",
         flexWrap:"wrap",gap:16,
-        background:`linear-gradient(180deg, ${T.bg2} 0%, ${T.bg} 100%)`,
+        background:T.bg2,
         position:"sticky",top:0,zIndex:50,
-        backdropFilter:"blur(8px)",
+        boxShadow:"0 1px 2px rgba(0,0,0,0.04)",
       }}>
-        <div style={{display:"flex",alignItems:"center",gap:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
           <div style={{
-            width:52,height:52,borderRadius:14,
-            background:`linear-gradient(135deg, ${T.teal} 0%, ${T.blue} 100%)`,
+            width:44,height:44,borderRadius:10,
+            background:T.strava,
             display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:20,fontWeight:800,color:"#000",flexShrink:0,
-            boxShadow:`0 8px 22px -8px ${T.teal}77`,
+            fontSize:18,fontWeight:800,color:"#fff",flexShrink:0,
             letterSpacing:"-.02em",
           }}>IC</div>
           <div>
-            <div className="eyebrow" style={{color:T.text3}}>Ironman 70.3 Western Australia · 5 Dec 2027</div>
-            <div style={{fontSize:22,fontWeight:800,marginTop:3,letterSpacing:"-.02em",color:T.text}}>Angus Nelson</div>
-            <div style={{fontSize:12.5,color:T.text2,marginTop:4,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-              <span>Sub 5:00 target</span>
-              <span style={{color:T.border2}}>·</span>
-              <span className="tabular" style={{color:T.teal,fontWeight:700,fontSize:13.5}}>{cd.total} days</span>
-              <span style={{color:T.border2}}>·</span>
+            <div style={{fontSize:18,fontWeight:800,letterSpacing:"-.01em",color:T.text,lineHeight:1.2}}>Angus Nelson</div>
+            <div style={{fontSize:12,color:T.text3,marginTop:3,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+              <span style={{fontWeight:600,color:T.text2}}>Ironman 70.3 WA</span>
+              <span>·</span>
+              <span>5 Dec 2027</span>
+              <span>·</span>
+              <span className="tabular" style={{color:T.strava,fontWeight:700}}>{cd.total} days</span>
+              <span>·</span>
               <span>Phase <span style={{color:phase.color,fontWeight:700}}>{phase.name}</span></span>
             </div>
           </div>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-          {syncMsg && <span style={{fontSize:12,color:syncMsg.startsWith("✓")?T.green:T.amber}}>{syncMsg}</span>}
-          <Btn onClick={doSync} disabled={syncing} style={{borderColor:T.strava,color:T.strava,background:"transparent"}}>
+          {syncMsg && <span style={{fontSize:12,fontWeight:600,color:syncMsg.startsWith("✓")?T.green:T.amber}}>{syncMsg}</span>}
+          <Btn primary onClick={doSync} disabled={syncing} style={{background:T.strava}}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
             {syncing ? "Syncing…" : "Sync Strava"}
           </Btn>
         </div>
       </div>
 
-      {/* Tab nav — pill style, sticky under header */}
+      {/* Tab nav — Strava-style underlined tabs, sticky under header */}
       <div style={{
-        display:"flex",gap:4,padding:"10px 28px",
+        display:"flex",gap:0,padding:"0 28px",
         borderBottom:`1px solid ${T.border}`,
         overflowX:"auto",alignItems:"center",
-        background:`${T.bg}cc`,
-        backdropFilter:"blur(6px)",
-        position:"sticky",top:104,zIndex:40,
+        background:T.bg2,
+        position:"sticky",top:78,zIndex:40,
       }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={()=>setTab(t.id)} className="tab-pill" style={{
-            padding:"8px 14px",fontSize:13,cursor:"pointer",
-            background:tab===t.id?`${T.teal}1a`:"transparent",
-            border:`1px solid ${tab===t.id?`${T.teal}44`:"transparent"}`,
-            borderRadius:8,
-            color:tab===t.id?T.teal:T.text2,
-            fontWeight:tab===t.id?700:500,whiteSpace:"nowrap",letterSpacing:".01em",
+          <button key={t.id} onClick={()=>setTab(t.id)} className="tab-underline" style={{
+            padding:"14px 18px",fontSize:13,cursor:"pointer",
+            background:"transparent",
+            border:"none",
+            borderBottom:tab===t.id?`3px solid ${T.strava}`:"3px solid transparent",
+            color:tab===t.id?T.text:T.text3,
+            fontWeight:tab===t.id?700:600,whiteSpace:"nowrap",letterSpacing:".01em",
+            marginBottom:-1,
           }}>{t.label}</button>
         ))}
-        <div className="hide-mobile" style={{marginLeft:"auto",fontSize:11,color:T.text3,padding:"8px 0",whiteSpace:"nowrap"}}>
+        <div className="hide-mobile" style={{marginLeft:"auto",fontSize:11,color:T.text3,whiteSpace:"nowrap"}}>
           Last sync: <span className="tabular">{lastSync}</span>
         </div>
       </div>
@@ -325,15 +330,15 @@ export default function IronmanDashboard() {
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18}}>
                 {[[cd.months,"Months"],[cd.weeks,"Weeks"],[cd.days,"Days"],[cd.total,"Total days"]].map(([v,l],i)=>(
                   <div key={l} style={{
-                    background:`linear-gradient(160deg, ${T.bg3} 0%, ${T.bg2} 100%)`,
-                    border:`1px solid ${T.border}`,
-                    borderRadius:10,padding:"16px 10px",textAlign:"center",
+                    background:i===3?T.stravaDim:T.bg3,
+                    border:`1px solid ${i===3?`${T.strava}33`:T.border}`,
+                    borderRadius:10,padding:"18px 10px",textAlign:"center",
                   }}>
                     <div className="tabular metric-num" style={{
                       fontSize:i===3?36:32,fontWeight:800,
-                      color:i===3?T.teal:T.text,lineHeight:1,letterSpacing:"-.02em",
+                      color:i===3?T.strava:T.text,lineHeight:1,letterSpacing:"-.02em",
                     }}>{v}</div>
-                    <div className="eyebrow" style={{marginTop:6,color:T.text3}}>{l}</div>
+                    <div className="eyebrow" style={{marginTop:6,color:i===3?T.strava:T.text3}}>{l}</div>
                   </div>
                 ))}
               </div>
@@ -482,10 +487,9 @@ export default function IronmanDashboard() {
                   {l:"Bike",v:tot.Bike.toFixed(0),u:"km",c:T.teal},
                   {l:"Run",v:tot.Run.toFixed(0),u:"km",c:T.purple},
                 ].map(m=>(
-                  <div key={m.l} className="card-hover" style={{
-                    background:`linear-gradient(160deg, ${T.bg2} 0%, ${T.bg3} 100%)`,
+                  <div key={m.l} className="card-hover card-shadow" style={{
+                    background:T.bg2,
                     border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 18px",
-                    boxShadow:"0 1px 0 rgba(255,255,255,0.02) inset",
                   }}>
                     <div className="eyebrow" style={{color:T.text3,marginBottom:8}}>{m.l}</div>
                     <div className="tabular metric-num" style={{fontSize:28,fontWeight:800,color:m.c,letterSpacing:"-.02em",lineHeight:1}}>
@@ -503,7 +507,7 @@ export default function IronmanDashboard() {
                     <CartesianGrid stroke={T.border} strokeDasharray="2 4" vertical={false}/>
                     <XAxis dataKey="label" tick={{fill:T.text3,fontSize:11}} stroke="transparent" tickLine={false}/>
                     <YAxis tick={{fill:T.text3,fontSize:11}} stroke="transparent" tickLine={false} width={32}/>
-                    <Tooltip contentStyle={{background:T.bg2,border:`1px solid ${T.border2}`,borderRadius:8,fontSize:12,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}} labelStyle={{color:T.text,fontWeight:600,marginBottom:4}} cursor={{fill:`${T.text}08`}}/>
+                    <Tooltip contentStyle={{background:T.bg2,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,boxShadow:"0 4px 14px rgba(0,0,0,0.08)"}} labelStyle={{color:T.text,fontWeight:600,marginBottom:4}} cursor={{fill:`${T.text}08`}}/>
                     <Bar dataKey="Swim" fill={T.blue} radius={[2,2,0,0]}/>
                     <Bar dataKey="Bike" fill={T.teal} radius={[2,2,0,0]}/>
                     <Bar dataKey="Run" fill={T.purple} radius={[2,2,0,0]}/>
@@ -526,7 +530,7 @@ export default function IronmanDashboard() {
                     <CartesianGrid stroke={T.border} strokeDasharray="2 4" vertical={false}/>
                     <XAxis dataKey="label" tick={{fill:T.text3,fontSize:11}} stroke="transparent" tickLine={false}/>
                     <YAxis tick={{fill:T.text3,fontSize:11}} stroke="transparent" tickLine={false} width={32}/>
-                    <Tooltip contentStyle={{background:T.bg2,border:`1px solid ${T.border2}`,borderRadius:8,fontSize:12,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}} labelStyle={{color:T.text,fontWeight:600,marginBottom:4}} cursor={{fill:`${T.text}08`}}/>
+                    <Tooltip contentStyle={{background:T.bg2,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,boxShadow:"0 4px 14px rgba(0,0,0,0.08)"}} labelStyle={{color:T.text,fontWeight:600,marginBottom:4}} cursor={{fill:`${T.text}08`}}/>
                     <Line type="monotone" dataKey="hrs" stroke={T.teal} strokeWidth={2} dot={{fill:T.teal,r:4}}/>
                   </LineChart>
                 </ResponsiveContainer>
@@ -560,7 +564,7 @@ export default function IronmanDashboard() {
 // ─── ACTIVITY ROW ────────────────────────────────────────────────────────────
 function ActivityRow({ a, detailed }) {
   return (
-    <div className="card-hover" style={{
+    <div className="card-hover card-shadow" style={{
       display:"flex",alignItems:"center",gap:14,
       padding:"14px 16px",
       background:T.bg2,
